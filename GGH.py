@@ -1,42 +1,92 @@
 import numpy as np
 
 
-class System():
+class GGH:
 
-    def __init__(self, dim, bound):
+    def __init__(self, dim):
+
         self.dim = dim
-        self.bound = bound
-        self.R = self.GEN_rand_basis()
-        self.U = self.GEN_unimodular()
-        self.B = self.U @ self.R
 
-    def GEN_rand_basis(self):
-        k = np.round(np.sqrt(self.dim) * self.bound)
-        return (k * np.identity(self.dim)).astype('int64') + np.random.randint(-self.bound, self.bound,
-                                                                               size=(self.dim, self.dim)).astype(
-            'int64')
+        self.R = None
+        self.B = None
+        self.U = None
 
-    def GEN_unimodular(self):
-        l = np.tril(np.random.randint(-1, 1, size=(self.dim, self.dim))).astype('int64')
-        u = np.triu(np.random.randint(-1, 1, size=(self.dim, self.dim))).astype('int64')
+        self.delta = None
+
+    
+    def __del__(self):
+
+        return None
+
+
+    def CryptGenKey(self):
+
+        k = np.round(np.sqrt(self.dim) * 4)
+
+        l = np.tril(np.random.randint(-1, 1, size = (self.dim, self.dim)))
+        u = np.triu(np.random.randint(-1, 1, size = (self.dim, self.dim)))
 
         for i in range(self.dim):
-            l[i, i] = u[i, i] = 1
+            l[i, i] = u[i, i] = np.random.choice([1, -1])
 
-        return (l @ u).astype('int64')
+        self.U = l @ u
 
-    def UT_check_noise_accuracy(self, e):
-        return True if np.sum(np.round(e @ np.linalg.inv(self.R))) == 0. else False
+        while True:
+            self.R = k * np.identity(self.dim) + np.random.randint(-4, 4, size = (self.dim, self.dim))
+            self.inv_R = self.inv(self.R)
 
-    '''
-    def UT_Babai_rounding(self, w):
-        L = np.round(np.linalg.solve(self.R, w))
-        return L @ self.R
-    '''
+            norms = []
+            for i in range(self.dim):
+                norms.append(self.L1(self.inv_R[i, :]))
 
-    def PKE_encrypt(self, m, e):
-        return (m @ self.B).astype('int64') + e.astype('int64')
+            self.delta = int(np.floor(max(norms)))
 
-    def PKE_decrypt(self, c):
-        return ((np.round(c @ np.linalg.inv(self.R))).astype('int64') @ np.linalg.inv(self.U).astype('int64')).astype(
-            'int64')
+            if self.delta >= 1 and self.HadamardRatio() > 0.8:
+                break
+        
+        self.B = self.U @ self.R
+
+    
+    def CryptGetUserKey(self):
+
+        pub = GGH(self.dim)
+
+        pub.B = self.B
+        pub.delta = self.delta
+
+        return pub
+
+
+    def CryptDestroyKey(self):
+
+        return self.__del__()
+
+    
+    def CryptEncrypt(self, m):
+
+        e = np.random.choice([-self.delta, self.delta], size = self.dim)
+        return m @ self.B + e
+
+
+    def CryptDecrypt(self, c):
+
+        return np.round(c @ self.inv_R) @ self.inv(self.U)
+
+    
+    def HadamardRatio(self):
+
+        ratio = np.abs(self.det(self.R))
+
+        for i in range(self.dim):
+            ratio /= self.L2(self.R[:, i])
+
+        return pow(ratio, 1 / self.dim)
+
+
+    L1 = staticmethod(lambda x: np.linalg.norm(x, 1))
+
+    L2 = staticmethod(lambda x: np.linalg.norm(x, 2))
+
+    inv = staticmethod(lambda x: np.linalg.inv(x))
+
+    det = staticmethod(lambda x: np.linalg.det(x))
