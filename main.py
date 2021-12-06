@@ -1,25 +1,33 @@
-import numpy as np
+from GGH import *
 
-from GGH import System
+# генерація ключів для двох абонентів
+Alice = GGH(10)
+Alice.CryptGenKey()
+Bob   = GGH(10)
+Bob.CryptGenKey()
 
-L1 = lambda x: np.linalg.norm(x, 1)
-L2 = lambda x: np.linalg.norm(x, 2)
-Linf = lambda x: np.max(np.absolute(x))
-det = lambda x: np.linalg.det(x)
+# виділення публічних ключів абонентів
+pub_Alice = Alice.CryptGetUserKey()
+pub_Bob   = Bob.CryptGetUserKey()
 
-GGH = System(5, 5)
+# Боб шифрує повідомлення для Аліси:
+m = np.random.randint(-100, 100, pub_Alice.dim)
+c = pub_Alice.CryptEncrypt(m)
 
-e = np.random.randint(-1, 1, GGH.dim)
+#Аліса розшифровує повідомлення від Боба:
+M = Alice.CryptDecrypt(c)
 
-while not GGH.UT_check_noise_accuracy(e):
-    e = np.random.randint(-1, 1, GGH.dim)
+#перевірка коректності:
+if np.all(M == m):
+    print('received')
 
-m = np.random.randint(-100, 100, GGH.dim)
-c = GGH.PKE_encrypt(m, e)
-M = GGH.PKE_decrypt(c)
+# Аліса шифрує повідомлення для Боба:
+m = np.random.randint(-100, 100, pub_Bob.dim)
+c = pub_Bob.CryptEncrypt(m)
 
-print(m)
+#Аліса розшифровує повідомлення від Боба:
+M = Bob.CryptDecrypt(c)
 
-print(M)
-
-print(np.all(M.astype('int64') == m))
+#перевірка коректності:
+if np.all(M == m):
+    print('received')
